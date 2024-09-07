@@ -36,6 +36,7 @@ class DownloadWidget(QWidget):
 
         self.major = self.config['major']
         self.build = self.config['build']
+        self.minor = self.config['minor']
 
         self.total_files = 0
         self.downloaded_files = 0
@@ -249,10 +250,13 @@ class DownloadWidget(QWidget):
 
         elif login_failed_error_code == 8:
             reply = QMessageBox.question(
-                self, 'Warning', 'Can\'t fetch current info, build and major from config are outdated. There was probably a game update, would you like to automatically update them ?', QMessageBox.Yes | QMessageBox.No)
+                self, 'Warning', 'Can\'t fetch current info, build, major and minor from config are outdated. There was probably a game update, would you like to automatically update them ?', QMessageBox.Yes | QMessageBox.No)
 
             if reply == QMessageBox.Yes:
                 self.update_client_hello_version()
+
+            else:
+                self.parent.reset_status_bar()
 
             return
 
@@ -299,7 +303,7 @@ class DownloadWidget(QWidget):
         client_hello_writer.write_int(27)
         client_hello_writer.write_int(self.major)
         client_hello_writer.write_int(self.build)
-        client_hello_writer.write_int(0)
+        client_hello_writer.write_int(self.minor)
         client_hello_writer.write_string('')
         client_hello_writer.write_int(2)
         client_hello_writer.write_int(2)
@@ -328,19 +332,18 @@ class DownloadWidget(QWidget):
         self.parent.show_loading()
 
         self.bruteforce_thread = UpdateClientHelloVersionThread(self)
-
         self.bruteforce_thread.values_found.connect(self.on_values_found)
-
         self.bruteforce_thread.start()
 
     def on_values_found(self):
         self.bruteforce_thread.quit()
 
         self.parent.hide_loading()
-        self.parent.status_bar_label.setText('Successfully bruteforced build and major ! New major version: {}, new build version: {}'.format(self.major, self.build))
+        self.parent.status_bar_label.setText('Successfully bruteforced build, major and minor ! New major version: {}, new build version: {}, new minor version: {}'.format(self.major, self.build, self.minor))
 
         self.config['major'] = self.major
         self.config['build'] = self.build
+        self.config['minor'] = self.minor
 
         self.parent.save_config()
 
@@ -424,7 +427,7 @@ class DownloadWidget(QWidget):
         self.start_button.setEnabled(True)
 
     def display_bruteforce_info(self):
-        self.parent.status_bar_label.setText('Bruteforce started ! Trying with major {} and build {}'.format(self.major, self.build))
+        self.parent.status_bar_label.setText('Bruteforce started ! Trying with major {}, build {}, minor {}'.format(self.major, self.build, self.minor))
 
 
 class InfoFetcherThread(QThread):
@@ -451,11 +454,15 @@ class UpdateClientHelloVersionThread(QThread):
     def run(self):
         major_found = False
         build_found = False
+        minor_found = False
+        MAX_BUILD = 20000
 
-        # Check major first with build 0 to avoid getting error code 9 due to too high build instead of too high major
         build = self.parent.build
 
+        # Check major first with build & minor set to 0 so we avoid getting
+        # an error code 9 due to too high build or minor instead of too high major
         self.parent.build = 0
+        self.parent.minor = 0
 
         while not major_found:
             self.parent.major += 1
@@ -472,11 +479,34 @@ class UpdateClientHelloVersionThread(QThread):
         if reset_build:
             self.parent.build = 0
 
+        # dichotomic search to speed up the process
+        build_low, build_high = self.parent.build, MAX_BUILD
         while not build_found:
-            self.parent.build += 1
+            self.parent.build = (build_low + build_high) // 2
+
             self.parent.display_bruteforce_info()
             login_failed = self.parent.request_login_failed()
 
-            build_found = login_failed.read_vint() == 7
+            login_failed_code = login_failed.read_vint()
 
+            if login_failed_code == 8:
+                build_low = self.parent.build + 1
+
+            elif login_failed_code == 9:
+                build_high = self.parent.build - 1
+
+            else:
+                build_alert_box('Error', 'Unexpected login failed error code during bruteforce (major={}, build={}, minor={}): {}'.format(self.major, self.build, self.minor, login_failed_code))
+
+            build_found = (build_low + build_high) // 2 == self.parent.build
+
+        self.parent.build = build_low - 1
+
+        while not minor_found:
+            self.parent.display_bruteforce_info()
+            login_failed = self.parent.request_login_failed()
+            minor_found = login_failed.read_vint() == 7
+            self.parent.minor += 1
+
+        self.parent.minor -= 1
         self.values_found.emit()

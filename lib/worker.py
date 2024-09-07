@@ -39,7 +39,16 @@ class DownloadWorker(QThread):
 
                 with open(join_path(self.output_dir, filename), 'wb') as f:
                     if self.decompress_data and filename.endswith(('.csv', '.sc')):
-                        f.write(decompress(file_data.read()))
+                        compressed_data = file_data.read()
+
+                        try:
+                            decompressed = decompress(compressed_data)
+                        
+                        except:
+                            print('[x] Failed to decompress file {}'.format(filename))
+                            decompressed = compressed_data
+
+                        f.write(decompressed)
 
                     else:
                         f.write(file_data.read())

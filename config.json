@@ -1,6 +1,7 @@
 {
     "workers_count": 4,
     "output_path": "output",
-    "major": 6,
-    "build": 256
+    "major": 7,
+    "build": 288,
+    "minor": 38
 }
