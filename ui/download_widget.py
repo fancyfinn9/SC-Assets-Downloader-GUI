@@ -97,7 +97,7 @@ class DownloadWidget(QWidget):
         self.browse_fingerprint_widget.setLayout(self.browse_fingerprint_layout)
         self.browse_fingerprint_widget.hide()
 
-        self.enable_compression_checkbox = QCheckBox('Enable LZMA/LZHAM\ndecompression for\nCSV / SC files')
+        self.enable_compression_checkbox = QCheckBox('Decompress compressed\nassets (.sc, .csv and .toml)')
 
         self.left_panel_layout.addWidget(QLabel('Download from:'))
         self.left_panel_layout.addWidget(self.download_method_combo_box)

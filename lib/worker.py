@@ -38,7 +38,7 @@ class DownloadWorker(QThread):
                 os.makedirs(os.path.dirname(join_path(self.output_dir, filename)), exist_ok=True)
 
                 with open(join_path(self.output_dir, filename), 'wb') as f:
-                    if self.decompress_data and filename.endswith(('.csv', '.sc')):
+                    if self.decompress_data and filename.endswith(('.csv', '.sc', '.toml')):
                         compressed_data = file_data.read()
 
                         try:
