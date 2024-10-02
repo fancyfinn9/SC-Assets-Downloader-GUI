@@ -489,14 +489,18 @@ class UpdateClientHelloVersionThread(QThread):
 
             login_failed_code = login_failed.read_vint()
 
-            if login_failed_code == 8:
+            if login_failed_code == 7:
+                build_low = self.parent.build + 1
+                break
+
+            elif login_failed_code == 8:
                 build_low = self.parent.build + 1
 
             elif login_failed_code == 9:
                 build_high = self.parent.build - 1
 
             else:
-                build_alert_box('Error', 'Unexpected login failed error code during bruteforce (major={}, build={}, minor={}): {}'.format(self.major, self.build, self.minor, login_failed_code))
+                build_alert_box('Error', 'Unexpected login failed error code during bruteforce (major={}, build={}, minor={}): {}'.format(self.parent.major, self.parent.build, self.parent.minor, login_failed_code))
 
             build_found = (build_low + build_high) // 2 == self.parent.build
 
